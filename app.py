@@ -17,7 +17,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 애드센스 메타 태그 삽입 (구글 로봇이 가장 먼저 읽을 수 있도록 최상단 배치)
+# [중요] 구글 애드센스 소유권 확인 메타 태그
+# 이 부분이 HTML 소스 코드의 상단에 위치하여 크롤러가 가장 먼저 발견하도록 합니다.
 st.markdown(
     """
     <head>
