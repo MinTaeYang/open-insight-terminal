@@ -6,9 +6,10 @@ from typing import List, Dict
 
 import feedparser
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ----------------------------
-# 1. Page Configuration & AdSense Verification
+# 1. Page Configuration & AdSense Verification (Best-effort on Streamlit)
 # ----------------------------
 st.set_page_config(
     page_title="OPEN INSIGHT",
@@ -17,15 +18,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# [중요] 구글 애드센스 소유권 확인 메타 태그
-# 이 부분이 HTML 소스 코드의 상단에 위치하여 크롤러가 가장 먼저 발견하도록 합니다.
-st.markdown(
+# ✅ [중요] AdSense 소유권 확인 메타 태그 (Streamlit에서 가능한 최선의 방식)
+# Streamlit Community Cloud는 index.html <head>를 직접 수정할 수 없어서,
+# JS로 document.head에 meta를 실제 삽입하는 방식으로 "최대한" 맞춥니다.
+components.html(
     """
-    <head>
-    <meta name="google-adsense-account" content="ca-pub-5334002072937874">
-    </head>
+    <script>
+      (function () {
+        try {
+          var existing = document.querySelector('head meta[name="google-adsense-account"]');
+          if (!existing) {
+            var meta = document.createElement('meta');
+            meta.setAttribute('name', 'google-adsense-account');
+            meta.setAttribute('content', 'ca-pub-5334002072937874');
+            document.head.appendChild(meta);
+          }
+        } catch (e) {
+          // ignore
+        }
+      })();
+    </script>
     """,
-    unsafe_allow_html=True
+    height=0,
 )
 
 # ----------------------------
@@ -153,35 +167,44 @@ if "pick_recent" not in st.session_state:
 if "pick_fav" not in st.session_state:
     st.session_state.pick_fav = ""
 
+
 def trigger_search():
     st.session_state.run_search = True
+
 
 def set_query_and_search(q: str):
     st.session_state.query = q
     st.session_state.run_search = True
 
+
 def push_recent(q: str, max_n: int = 8):
     q = q.strip()
-    if not q: return
+    if not q:
+        return
     rec = [x for x in st.session_state.recent_keywords if x != q]
     rec.insert(0, q)
     st.session_state.recent_keywords = rec[:max_n]
+
 
 def clear_recent():
     st.session_state.recent_keywords = []
     st.session_state.pick_recent = ""
 
+
 def toggle_favorite(q: str):
     q = q.strip()
-    if not q: return
+    if not q:
+        return
     fav = st.session_state.favorites
     if q in fav:
         st.session_state.favorites = [x for x in fav if x != q]
     else:
         st.session_state.favorites = [q] + fav
 
+
 def is_favorite(q: str) -> bool:
     return q.strip() in st.session_state.favorites
+
 
 def normalize_title(title: str) -> str:
     t = title.strip()
@@ -191,8 +214,10 @@ def normalize_title(title: str) -> str:
     t = re.sub(r"\s+", " ", t).strip().lower()
     return t
 
+
 def similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
+
 
 def dedupe_entries(entries: List[Dict], title_sim_threshold: float = 0.90) -> List[Dict]:
     seen_links = set()
@@ -201,19 +226,26 @@ def dedupe_entries(entries: List[Dict], title_sim_threshold: float = 0.90) -> Li
     for e in entries:
         link = (e.get("link") or "").strip()
         title = (e.get("title") or "").strip()
+
         if link:
             try:
                 p = urlparse(link)
                 canonical = p._replace(query="", fragment="").geturl()
-            except Exception: canonical = link
-            if canonical in seen_links: continue
+            except Exception:
+                canonical = link
+            if canonical in seen_links:
+                continue
             seen_links.add(canonical)
+
         nt = normalize_title(title)
         if nt:
-            if any(similar(nt, kt) >= title_sim_threshold for kt in kept_titles): continue
+            if any(similar(nt, kt) >= title_sim_threshold for kt in kept_titles):
+                continue
             kept_titles.append(nt)
+
         out.append(e)
     return out
+
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_entries(keyword: str) -> List[Dict]:
@@ -222,12 +254,15 @@ def fetch_entries(keyword: str) -> List[Dict]:
     feed = feedparser.parse(url)
     items = []
     for entry in getattr(feed, "entries", []) or []:
-        items.append({
-            "title": getattr(entry, "title", ""),
-            "link": getattr(entry, "link", ""),
-            "published": getattr(entry, "published", ""),
-        })
+        items.append(
+            {
+                "title": getattr(entry, "title", ""),
+                "link": getattr(entry, "link", ""),
+                "published": getattr(entry, "published", ""),
+            }
+        )
     return items
+
 
 def on_pick_recent():
     val = (st.session_state.pick_recent or "").strip()
@@ -235,11 +270,13 @@ def on_pick_recent():
         st.session_state.pick_recent = ""
         set_query_and_search(val)
 
+
 def on_pick_fav():
     val = (st.session_state.pick_fav or "").strip()
     if val:
         st.session_state.pick_fav = ""
         set_query_and_search(val)
+
 
 # ----------------------------
 # 4. Sidebar & Layout
@@ -251,28 +288,55 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 즐겨찾기")
     if st.session_state.favorites:
-        st.selectbox("즐겨찾기 선택", options=[""] + st.session_state.favorites[:20], key="pick_fav", on_change=on_pick_fav, label_visibility="collapsed")
-    else: st.caption("아직 없습니다.")
+        st.selectbox(
+            "즐겨찾기 선택",
+            options=[""] + st.session_state.favorites[:20],
+            key="pick_fav",
+            on_change=on_pick_fav,
+            label_visibility="collapsed",
+        )
+    else:
+        st.caption("아직 없습니다.")
     st.markdown("---")
     st.markdown("### 최근 검색")
     if st.session_state.recent_keywords:
-        st.selectbox("최근 선택", options=[""] + st.session_state.recent_keywords[:20], key="pick_recent", on_change=on_pick_recent, label_visibility="collapsed")
+        st.selectbox(
+            "최근 선택",
+            options=[""] + st.session_state.recent_keywords[:20],
+            key="pick_recent",
+            on_change=on_pick_recent,
+            label_visibility="collapsed",
+        )
         if st.button("기록 삭제", use_container_width=True):
             clear_recent()
             st.rerun()
-    else: st.caption("아직 없습니다.")
+    else:
+        st.caption("아직 없습니다.")
 
 st.markdown('<div class="hero-title">Open Insight</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-subtitle">키워드를 입력하면 최신 헤드라인을 정리해 보여줍니다.</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-subtitle">키워드를 입력하면 최신 헤드라인을 정리해 보여줍니다.</div>',
+    unsafe_allow_html=True,
+)
 
 c1, c2, c3 = st.columns([6, 1, 1], vertical_alignment="bottom")
 with c1:
-    st.text_input("분석할 마켓 키워드를 입력하세요", placeholder="예: 반도체 수출, 연준 금리 결정", key="query", on_change=trigger_search)
+    st.text_input(
+        "분석할 마켓 키워드를 입력하세요",
+        placeholder="예: 반도체 수출, 연준 금리 결정",
+        key="query",
+        on_change=trigger_search,
+    )
 with c2:
-    if st.button("검색", use_container_width=True): st.session_state.run_search = True
+    if st.button("검색", use_container_width=True):
+        st.session_state.run_search = True
 with c3:
-    current_for_star = (st.session_state.query or "").strip() or (st.session_state.last_keyword or "").strip()
-    star_label = "★ 저장" if current_for_star and not is_favorite(current_for_star) else "★ 해제"
+    current_for_star = (st.session_state.query or "").strip() or (
+        st.session_state.last_keyword or ""
+    ).strip()
+    star_label = (
+        "★ 저장" if current_for_star and not is_favorite(current_for_star) else "★ 해제"
+    )
     if st.button(star_label, use_container_width=True, disabled=not bool(current_for_star)):
         toggle_favorite(current_for_star)
         st.rerun()
@@ -282,7 +346,8 @@ keyword = (st.session_state.query or "").strip() or DEFAULT_QUERY
 if st.session_state.run_search:
     with st.spinner("뉴스 불러오는 중..."):
         entries = fetch_entries(keyword)
-    if dedupe_on: entries = dedupe_entries(entries)
+    if dedupe_on:
+        entries = dedupe_entries(entries)
     st.session_state.last_keyword = keyword
     st.session_state.feed_entries = entries
     push_recent(keyword)
@@ -299,9 +364,14 @@ else:
     st.session_state.limit = limit
 
     for entry in entries[:limit]:
-        title, link, published = entry.get("title", ""), entry.get("link", "#"), entry.get("published", "")
+        title, link, published = (
+            entry.get("title", ""),
+            entry.get("link", "#"),
+            entry.get("published", ""),
+        )
         source = urlparse(link).netloc.replace("www.", "") if link else ""
-        st.markdown(f"""
+        st.markdown(
+            f"""
             <div class="news-item">
               <a href="{link}" target="_blank" rel="noopener noreferrer" class="news-link">{title}</a>
               <div class="news-meta">
@@ -309,6 +379,8 @@ else:
                 <span>{published}</span>
               </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown('<div class="small-footer">© 2026 Open Insight</div>', unsafe_allow_html=True)
