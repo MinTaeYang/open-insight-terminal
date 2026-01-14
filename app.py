@@ -1,118 +1,404 @@
-import streamlit as st
-import feedparser
+import re
 import urllib.parse
-from datetime import datetime
-import streamlit.components.v1 as components
+from urllib.parse import urlparse
+from difflib import SequenceMatcher
+from typing import List, Dict
 
-# 1. 페이지 인터페이스 및 브랜딩 설정
-st.set_page_config(page_title="OPEN INSIGHT TERMINAL", page_icon="🌐", layout="wide")
+import feedparser
+import streamlit as st
 
-# 2. 애드센스 소유권 확인 스크립트
-# [중요] 'ca-pub-0000000000000000' 부분을 본인의 애드센스 ID로 꼭 수정하세요.
-components.html("""
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0000000000000000"
-     crossorigin="anonymous"></script>
-""", height=0)
 
-# 3. 하이테크 커스텀 CSS
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700&display=swap');
-    * { font-family: 'Pretendard', sans-serif; }
-    .stApp { background-color: #0D1117; }
-    
-    .news-card {
-        background: #161B22;
-        padding: 25px;
-        border-radius: 12px;
-        border: 1px solid #30363D;
-        margin-bottom: 20px;
-        transition: all 0.3s ease;
-    }
-    .news-card:hover { 
-        border-color: #58A6FF; 
-        background: #1C2128;
-        transform: scale(1.01);
-    }
-    
-    .news-title { color: #58A6FF; font-size: 1.35rem; font-weight: 700; text-decoration: none; }
-    .news-meta { color: #8B949E; font-size: 0.9rem; margin-top: 12px; display: flex; gap: 15px; }
-    .badge { background: #238636; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
-    .stTextInput>div>div>input { background-color: #0D1117; color: white; border-radius: 10px; border: 1px solid #30363D; }
-    </style>
-    """, unsafe_allow_html=True)
+# ----------------------------
+# Page
+# ----------------------------
+st.set_page_config(
+    page_title="OPEN INSIGHT",
+    page_icon="🗞️",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-# 4. 사이드바 구성
-with st.sidebar:
-    st.markdown("<h2 style='color: #58A6FF;'>SYSTEM STATUS</h2>", unsafe_allow_html=True)
-    st.success("● NETWORK: CONNECTED")
-    st.info("● ACCESS: UNLIMITED (FREE)")
-    st.write("---")
-    st.markdown("### 📡 데이터 소스")
-    st.caption("Global Google News RSS Feed")
-    st.write("---")
-    st.markdown("### 💡 활용 팁")
-    st.write("특정 기업이나 자산(예: 비트코인, 테슬라)을 입력하면 관련 마켓 뉴스를 즉시 분석합니다.")
-    st.write("---")
-    st.markdown("### ☕ Support")
-    st.write("서비스가 마음에 드신다면 후원을 통해 응원해주세요!")
-    st.markdown("[![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-Donate-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/)")
+# ----------------------------
+# UI (minimal, list)
+# ----------------------------
+st.markdown(
+    """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+* { font-family: 'Pretendard', sans-serif; }
 
-# 5. 메인 대시보드 타이틀
-st.markdown("<h1 style='color: white; font-size: 2.8rem; font-weight: 800;'>OPEN INSIGHT TERMINAL</h1>", unsafe_allow_html=True)
-st.markdown("<p style='color: #8B949E; margin-bottom: 40px;'>전 세계 실시간 뉴스 데이터를 분석하여 마켓 인사이트를 확보하세요.</p>", unsafe_allow_html=True)
+.stApp { background-color: #0D1117; color: #E6EDF3; }
 
-# 6. 검색 및 자동 로딩 로직
-user_input = st.text_input("분석할 마켓 키워드를 입력하세요", placeholder="예: 삼성전자, 인공지능 주식, 나스닥 전망")
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
 
-# 봇 심사를 위해 초기 접속 시 '경제' 키워드로 자동 검색 실행
-current_keyword = user_input if user_input else "오늘의 경제 뉴스"
+.block-container {
+  padding-top: 56px;
+  padding-bottom: 48px;
+  max-width: 980px;
+}
 
-with st.spinner(f"'{current_keyword}' 분석 데이터 로딩 중..."):
-    encoded_keyword = urllib.parse.quote(current_keyword)
-    url = f"https://news.google.com/rss/search?q={encoded_keyword}&hl=ko&gl=KR&ceid=KR:ko"
-    feed = feedparser.parse(url)
+.hero-title {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px 0;
+}
+.hero-subtitle {
+  color: #94A3B8;
+  font-size: 15px;
+  margin: 0 0 16px 0;
+}
 
-    if feed.entries:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("뉴스 수", f"{len(feed.entries)} Articles")
-        c2.metric("보안 등급", "SECURE")
-        c3.metric("상태", "LIVE DATA")
-        
-        st.write(" ")
-        
-        for entry in feed.entries[:25]:
-            st.markdown(f"""
-                <div class="news-card">
-                    <span class="badge">MARKET DATA</span>
-                    <div style="margin-top:12px;">
-                        <a href="{entry.link}" target="_blank" class="news-title">{entry.title}</a>
-                    </div>
-                    <div class="news-meta">
-                        <span>📅 {entry.published}</span>
-                        <span>🌐 Verified Source</span>
-                        <span style="color: #238636;">● Insight Connected</span>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+.stTextInput > div > div > input {
+  background-color: #0B1220;
+  color: #E6EDF3;
+  border-radius: 14px;
+  border: 1px solid #1F2A3A;
+  padding: 12px 14px;
+}
+.stTextInput > div > div > input:focus {
+  border-color: #2B3B52;
+  box-shadow: none;
+}
+
+.stButton > button {
+  background: #E6EDF3;
+  color: #0D1117;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.stButton > button:hover {
+  background: #FFFFFF;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.news-item {
+  padding: 14px 2px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+.news-link {
+  color: #E6EDF3;
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.news-link:hover { text-decoration: underline; }
+
+.news-meta {
+  margin-top: 6px;
+  color: #94A3B8;
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.meta-pill {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #94A3B8;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.small-footer {
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 12px;
+  margin-top: 22px;
+}
+.small-footer a {
+  color: rgba(148, 163, 184, 0.9);
+  text-decoration: none;
+}
+.small-footer a:hover { text-decoration: underline; }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+# ----------------------------
+# Constants
+# ----------------------------
+DEFAULT_QUERY = "오늘의 경제"
+
+# ----------------------------
+# State
+# ----------------------------
+if "run_search" not in st.session_state:
+    st.session_state.run_search = True  # 첫 로딩 자동 검색
+if "query" not in st.session_state:
+    st.session_state.query = ""
+if "last_keyword" not in st.session_state:
+    st.session_state.last_keyword = ""
+if "feed_entries" not in st.session_state:
+    st.session_state.feed_entries = []  # List[Dict]
+if "recent_keywords" not in st.session_state:
+    st.session_state.recent_keywords = []  # List[str]
+if "favorites" not in st.session_state:
+    st.session_state.favorites = []  # List[str]
+if "limit" not in st.session_state:
+    st.session_state.limit = 25
+
+if "pick_recent" not in st.session_state:
+    st.session_state.pick_recent = ""
+if "pick_fav" not in st.session_state:
+    st.session_state.pick_fav = ""
+
+
+# ----------------------------
+# Helpers
+# ----------------------------
+def trigger_search():
+    """Enter(입력 확정) 시 자동 검색 트리거."""
+    st.session_state.run_search = True
+
+def set_query_and_search(q: str):
+    st.session_state.query = q
+    st.session_state.run_search = True
+
+def push_recent(q: str, max_n: int = 8):
+    q = q.strip()
+    if not q:
+        return
+    rec = [x for x in st.session_state.recent_keywords if x != q]
+    rec.insert(0, q)
+    st.session_state.recent_keywords = rec[:max_n]
+
+def clear_recent():
+    st.session_state.recent_keywords = []
+    st.session_state.pick_recent = ""
+
+def toggle_favorite(q: str):
+    q = q.strip()
+    if not q:
+        return
+    fav = st.session_state.favorites
+    if q in fav:
+        st.session_state.favorites = [x for x in fav if x != q]
     else:
-        st.error("데이터를 불러올 수 없습니다. 키워드를 확인해 주세요.")
+        st.session_state.favorites = [q] + fav
 
-# 7. 애드센스 승인 필수 푸터 (Privacy Policy 포함)
-st.write("---")
-st.markdown("### 🔍 About & Legal")
-st.write("""
-    OPEN INSIGHT TERMINAL은 실시간 마켓 트렌드 분석 도구입니다. 
-    우리는 Google News RSS 인덱스를 기반으로 사용자에게 시각화된 데이터 인사이트를 제공합니다.
-""")
+def is_favorite(q: str) -> bool:
+    return q.strip() in st.session_state.favorites
 
-st.markdown("""
-    <div style="text-align: center; color: #8B949E; font-size: 0.8rem; margin-top: 50px; padding: 20px; border-top: 1px solid #30363D;">
-        <p>© 2026 SUN (OPEN INSIGHT). All rights reserved.</p>
-        <p>
-            <a href="#" style="color: #58A6FF; text-decoration: none;">Privacy Policy</a> | 
-            <a href="#" style="color: #58A6FF; text-decoration: none;">Terms of Service</a>
-        </p>
-        <p style="font-size: 0.7rem;">본 서비스는 광고 수익을 통해 운영되며, 구글 애드센스 정책을 엄격히 준수합니다.</p>
-    </div>
-""", unsafe_allow_html=True)
+def normalize_title(title: str) -> str:
+    t = title.strip()
+    t = re.sub(r"\s+-\s+[^-]{2,}$", "", t).strip()
+    t = re.sub(r"[\u200b\u200c\u200d]+", "", t)
+    t = re.sub(r"[^\w\s가-힣]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip().lower()
+    return t
+
+def similar(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+def dedupe_entries(entries: List[Dict], title_sim_threshold: float = 0.90) -> List[Dict]:
+    seen_links = set()
+    kept_titles = []
+    out = []
+
+    for e in entries:
+        link = (e.get("link") or "").strip()
+        title = (e.get("title") or "").strip()
+
+        if link:
+            try:
+                p = urlparse(link)
+                canonical = p._replace(query="", fragment="").geturl()
+            except Exception:
+                canonical = link
+            if canonical in seen_links:
+                continue
+            seen_links.add(canonical)
+
+        nt = normalize_title(title)
+        if nt:
+            if any(similar(nt, kt) >= title_sim_threshold for kt in kept_titles):
+                continue
+            kept_titles.append(nt)
+
+        out.append(e)
+
+    return out
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_entries(keyword: str) -> List[Dict]:
+    encoded = urllib.parse.quote(keyword)
+    url = f"https://news.google.com/rss/search?q={encoded}&hl=ko&gl=KR&ceid=KR:ko"
+    feed = feedparser.parse(url)
+    items = []
+    for entry in getattr(feed, "entries", []) or []:
+        items.append({
+            "title": getattr(entry, "title", ""),
+            "link": getattr(entry, "link", ""),
+            "published": getattr(entry, "published", ""),
+        })
+    return items
+
+def on_pick_recent():
+    val = (st.session_state.pick_recent or "").strip()
+    if val:
+        st.session_state.pick_recent = ""
+        set_query_and_search(val)
+
+def on_pick_fav():
+    val = (st.session_state.pick_fav or "").strip()
+    if val:
+        st.session_state.pick_fav = ""
+        set_query_and_search(val)
+
+
+# ----------------------------
+# Sidebar (minimal + recent delete)
+# ----------------------------
+with st.sidebar:
+    st.markdown("### 옵션")
+    dedupe_on = st.toggle("중복 제거", value=True, help="링크/유사 제목 중복을 제거합니다.")
+    st.caption("Google News RSS (KR) 기반")
+
+    st.markdown("---")
+    st.markdown("### 즐겨찾기")
+    if st.session_state.favorites:
+        st.selectbox(
+            "즐겨찾기에서 선택",
+            options=[""] + st.session_state.favorites[:20],
+            key="pick_fav",
+            on_change=on_pick_fav,
+            label_visibility="collapsed",
+        )
+    else:
+        st.caption("아직 없습니다.")
+
+    st.markdown("---")
+    st.markdown("### 최근 검색")
+    if st.session_state.recent_keywords:
+        st.selectbox(
+            "최근에서 선택",
+            options=[""] + st.session_state.recent_keywords[:20],
+            key="pick_recent",
+            on_change=on_pick_recent,
+            label_visibility="collapsed",
+        )
+        if st.button("최근 검색기록 삭제", use_container_width=True):
+            clear_recent()
+            st.rerun()
+    else:
+        st.caption("아직 없습니다.")
+
+
+# ----------------------------
+# Header
+# ----------------------------
+st.markdown('<div class="hero-title">Open Insight</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-subtitle">키워드를 입력하면 최신 헤드라인을 정리해 보여줍니다.</div>',
+    unsafe_allow_html=True,
+)
+
+# ----------------------------
+# Search UI (Enter auto + button + favorite)
+# ----------------------------
+c1, c2, c3 = st.columns([6, 1, 1], vertical_alignment="bottom")
+
+with c1:
+    st.text_input(
+        "분석할 마켓 키워드를 입력하세요",
+        placeholder="예: 반도체 수출, 연준 금리 결정, 이더리움 시황",
+        key="query",
+        on_change=trigger_search,  # Enter 입력 시 자동 실행
+        label_visibility="visible",
+    )
+
+with c2:
+    if st.button("검색", use_container_width=True):
+        st.session_state.run_search = True
+
+with c3:
+    current_for_star = (st.session_state.query or "").strip() or (st.session_state.last_keyword or "").strip()
+    star_label = "★ 저장" if current_for_star and not is_favorite(current_for_star) else "★ 해제"
+    if st.button(star_label, use_container_width=True, disabled=not bool(current_for_star)):
+        toggle_favorite(current_for_star)
+        st.rerun()
+
+st.write("")
+
+# ----------------------------
+# Decide keyword
+# ----------------------------
+keyword = (st.session_state.query or "").strip() or DEFAULT_QUERY
+
+# ----------------------------
+# Fetch when triggered (cache results)
+# ----------------------------
+if st.session_state.run_search:
+    with st.spinner("뉴스 불러오는 중..."):
+        entries = fetch_entries(keyword)
+
+    if dedupe_on:
+        entries = dedupe_entries(entries, title_sim_threshold=0.90)
+
+    st.session_state.last_keyword = keyword
+    st.session_state.feed_entries = entries
+    push_recent(keyword)
+    st.session_state.run_search = False
+
+# ----------------------------
+# Render (always render cached results)
+# ----------------------------
+entries = st.session_state.feed_entries
+active_keyword = st.session_state.last_keyword or keyword
+
+if not entries:
+    st.caption("키워드를 입력하고 Enter를 누르거나, 사이드바의 최근/즐겨찾기에서 선택해 보세요.")
+else:
+    st.caption(f"키워드: {active_keyword} · 결과: {len(entries)}")
+
+    max_limit = max(10, min(50, len(entries)))
+    default_limit = min(st.session_state.limit, max_limit)
+    limit = st.slider(
+        "표시 개수",
+        min_value=10,
+        max_value=50,
+        value=default_limit,
+        step=5,
+        key="limit_slider",
+    )
+    st.session_state.limit = limit
+
+    for entry in entries[:limit]:
+        title = entry.get("title", "(no title)")
+        link = entry.get("link", "#")
+        published = entry.get("published", "")
+
+        source = ""
+        try:
+            source = urlparse(link).netloc.replace("www.", "")
+        except Exception:
+            source = ""
+
+        st.markdown(
+            f"""
+            <div class="news-item">
+              <a href="{link}" target="_blank" rel="noopener noreferrer" class="news-link">
+                {title}
+              </a>
+              <div class="news-meta">
+                {f'<span class="meta-pill">{source}</span>' if source else ''}
+                {f'<span>{published}</span>' if published else ''}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        """
+        <div class="small-footer">
+          © 2026 Open Insight · <a href="#" target="_self">Privacy</a> · <a href="#" target="_self">Terms</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
