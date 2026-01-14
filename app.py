@@ -19,12 +19,11 @@ st.set_page_config(
 )
 
 # ----------------------------
-# Google AdSense (추가된 부분)
+# Google AdSense 메타 태그 (승인용)
 # ----------------------------
 st.markdown(
     """
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5334002072937874"
-     crossorigin="anonymous"></script>
+    <meta name="google-adsense-account" content="ca-pub-5334002072937874">
     """,
     unsafe_allow_html=True
 )
