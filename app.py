@@ -173,7 +173,7 @@ def trigger_search():
 
 
 def set_query_and_search(q: str):
-    st.session_state.query = q
+    st.session_state.query = (q or "").strip()
     st.session_state.run_search = True
 
 
@@ -279,6 +279,20 @@ def on_pick_fav():
 
 
 # ----------------------------
+# ✅ AdSense 정책 안전 패치: "콘텐츠 없는 화면" 방지
+# ----------------------------
+# - 첫 진입/초기 상태에서 query가 비어있고, 아직 last_keyword도 없고, feed_entries도 없으면
+#   DEFAULT_QUERY로 자동 검색을 트리거해서 빈 화면을 없앱니다.
+if (
+    not (st.session_state.query or "").strip()
+    and not (st.session_state.last_keyword or "").strip()
+    and not st.session_state.feed_entries
+):
+    st.session_state.query = DEFAULT_QUERY
+    st.session_state.run_search = True
+
+
+# ----------------------------
 # 4. Sidebar & Layout
 # ----------------------------
 with st.sidebar:
@@ -356,10 +370,21 @@ if st.session_state.run_search:
 entries = st.session_state.feed_entries
 active_keyword = st.session_state.last_keyword or keyword
 
+# ✅ "콘텐츠 없음" 화면을 완전히 빈 화면으로 두지 않고, 가치 있는 안내 블록을 보여줌
 if not entries:
-    st.caption("키워드를 입력하고 Enter를 누르세요.")
+    st.info(
+        "현재 키워드에 대한 헤드라인을 가져오지 못했어요. "
+        "다른 키워드(예: 반도체, 환율, 미국 금리, ETF, 비트코인)로 다시 검색해보세요."
+    )
+    st.caption(f"현재 키워드: {active_keyword}")
+    # (선택) 여기에도 기본 추천 버튼 등을 두면 더 안전/체류시간 상승
 else:
     st.caption(f"키워드: {active_keyword} · 결과: {len(entries)}")
+
+    # (선택) 나중에 광고 코드를 넣는다면 "entries 충분할 때만" 로드:
+    # if len(entries) >= 5:
+    #     components.html("<!-- ads code here -->", height=0)
+
     limit = st.slider("표시 개수", 10, 50, st.session_state.limit, 5, key="limit_slider")
     st.session_state.limit = limit
 
@@ -383,4 +408,4 @@ else:
             unsafe_allow_html=True,
         )
 
-    st.markdown('<div class="small-footer">© 2026 Open Insight</div>', unsafe_allow_html=True)
+st.markdown('<div class="small-footer">© 2026 Open Insight</div>', unsafe_allow_html=True)
