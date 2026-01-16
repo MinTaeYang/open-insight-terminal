@@ -15,7 +15,7 @@ st.set_page_config(
     page_title="OPEN INSIGHT",
     page_icon="🗞️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ✅ [중요] AdSense 소유권 확인 메타 태그 (Streamlit에서 가능한 최선의 방식)
@@ -424,3 +424,4 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
