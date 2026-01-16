@@ -55,7 +55,7 @@ st.markdown(
 
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
+/* ✅ header는 숨기지 않음: 좌측 상단 사이드바 토글(☰/>)이 필요 */
 
 .block-container {
   padding-top: 56px;
@@ -132,12 +132,19 @@ header {visibility: hidden;}
   color: rgba(148, 163, 184, 0.7);
   font-size: 12px;
   margin-top: 22px;
+  line-height: 1.55;
 }
 .small-footer a {
   color: rgba(148, 163, 184, 0.9);
   text-decoration: none;
 }
 .small-footer a:hover { text-decoration: underline; }
+
+.small-footer .note {
+  display: block;
+  margin-top: 6px;
+  color: rgba(148, 163, 184, 0.65);
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -412,14 +419,19 @@ else:
             unsafe_allow_html=True,
         )
 
-# ✅ [추가] 하단에도 정책 링크를 가볍게 노출 (선택이지만 추천)
+# ✅ 하단(푸터)에도 정책 링크 + 면책을 노출 (사이드바가 닫혀 있어도 보이게)
 st.markdown(
     """
 <div class="small-footer">
-  © 2026 Open Insight ·
-  <a href="https://mintaeyang.github.io/" target="_blank" rel="noopener">홈</a> ·
-  <a href="https://mintaeyang.github.io/privacy.html" target="_blank" rel="noopener">개인정보</a> ·
-  <a href="https://mintaeyang.github.io/terms.html" target="_blank" rel="noopener">약관</a>
+  <div>
+    © 2026 Open Insight ·
+    <a href="https://mintaeyang.github.io/" target="_blank" rel="noopener">홈</a> ·
+    <a href="https://mintaeyang.github.io/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a> ·
+    <a href="https://mintaeyang.github.io/terms.html" target="_blank" rel="noopener">이용약관</a> ·
+    <a href="mailto:openinsight.contact@gmail.com" rel="noopener">문의</a>
+  </div>
+  <span class="note">※ 본 서비스는 투자 자문/권유가 아니며, 제공 정보의 최종 판단과 책임은 사용자에게 있습니다.</span>
+  <span class="note">※ 헤드라인/링크는 Google News RSS 기반이며, 기사 저작권은 각 언론사에 있습니다.</span>
 </div>
 """,
     unsafe_allow_html=True,
