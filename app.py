@@ -281,8 +281,6 @@ def on_pick_fav():
 # ----------------------------
 # ✅ AdSense 정책 안전 패치: "콘텐츠 없는 화면" 방지
 # ----------------------------
-# - 첫 진입/초기 상태에서 query가 비어있고, 아직 last_keyword도 없고, feed_entries도 없으면
-#   DEFAULT_QUERY로 자동 검색을 트리거해서 빈 화면을 없앱니다.
 if (
     not (st.session_state.query or "").strip()
     and not (st.session_state.last_keyword or "").strip()
@@ -296,10 +294,21 @@ if (
 # 4. Sidebar & Layout
 # ----------------------------
 with st.sidebar:
+    # ✅ [추가] 정책 링크/면책/문의 (승인/신뢰도 보강용)
+    st.markdown("### Open Insight")
+    st.markdown("- 홈: https://mintaeyang.github.io/")
+    st.markdown("- 개인정보: https://mintaeyang.github.io/privacy.html")
+    st.markdown("- 이용약관: https://mintaeyang.github.io/terms.html")
+    st.markdown("- 문의: openinsight.contact@gmail.com")
+    st.caption("※ 본 서비스는 투자 자문/권유가 아니며, 제공 정보의 최종 판단과 책임은 사용자에게 있습니다.")
+    st.caption("※ 헤드라인/링크는 Google News RSS 기반이며, 기사 저작권은 각 언론사에 있습니다.")
+    st.markdown("---")
+
     st.markdown("### 옵션")
     dedupe_on = st.toggle("중복 제거", value=True)
     st.caption("Google News RSS 기반")
     st.markdown("---")
+
     st.markdown("### 즐겨찾기")
     if st.session_state.favorites:
         st.selectbox(
@@ -312,6 +321,7 @@ with st.sidebar:
     else:
         st.caption("아직 없습니다.")
     st.markdown("---")
+
     st.markdown("### 최근 검색")
     if st.session_state.recent_keywords:
         st.selectbox(
@@ -370,20 +380,14 @@ if st.session_state.run_search:
 entries = st.session_state.feed_entries
 active_keyword = st.session_state.last_keyword or keyword
 
-# ✅ "콘텐츠 없음" 화면을 완전히 빈 화면으로 두지 않고, 가치 있는 안내 블록을 보여줌
 if not entries:
     st.info(
         "현재 키워드에 대한 헤드라인을 가져오지 못했어요. "
         "다른 키워드(예: 반도체, 환율, 미국 금리, ETF, 비트코인)로 다시 검색해보세요."
     )
     st.caption(f"현재 키워드: {active_keyword}")
-    # (선택) 여기에도 기본 추천 버튼 등을 두면 더 안전/체류시간 상승
 else:
     st.caption(f"키워드: {active_keyword} · 결과: {len(entries)}")
-
-    # (선택) 나중에 광고 코드를 넣는다면 "entries 충분할 때만" 로드:
-    # if len(entries) >= 5:
-    #     components.html("<!-- ads code here -->", height=0)
 
     limit = st.slider("표시 개수", 10, 50, st.session_state.limit, 5, key="limit_slider")
     st.session_state.limit = limit
@@ -408,4 +412,15 @@ else:
             unsafe_allow_html=True,
         )
 
-st.markdown('<div class="small-footer">© 2026 Open Insight</div>', unsafe_allow_html=True)
+# ✅ [추가] 하단에도 정책 링크를 가볍게 노출 (선택이지만 추천)
+st.markdown(
+    """
+<div class="small-footer">
+  © 2026 Open Insight ·
+  <a href="https://mintaeyang.github.io/" target="_blank" rel="noopener">홈</a> ·
+  <a href="https://mintaeyang.github.io/privacy.html" target="_blank" rel="noopener">개인정보</a> ·
+  <a href="https://mintaeyang.github.io/terms.html" target="_blank" rel="noopener">약관</a>
+</div>
+""",
+    unsafe_allow_html=True,
+)
